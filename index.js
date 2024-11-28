@@ -17,36 +17,58 @@ db.connect();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// GET home page
-app.get("/", async (req, res) => {
+// checking if the country has been added already to the visited country
+async function checkVisisted() {
   const result = await db.query("SELECT country_code FROM visited_countries");
-  // assign countries as emty array
+
   let countries = [];
   result.rows.forEach((country) => {
     countries.push(country.country_code);
   });
-  console.log(result.rows);
+  return countries;
+}
+
+// GET home page
+app.get("/", async (req, res) => {
+  const countries = await checkVisisted();
   res.render("index.ejs", { countries: countries, total: countries.length });
-  db.end();
 });
 
-// Insert new country
+//Insert new country with try catch
 app.post("/add", async (req, res) => {
   const input = req.body["country"];
 
-  const result = await db.query(
-    "SELECT country_code FROM countries WHERE country_name = $1",
-    [input]
-  );
+  try {
+    const result = await db.query(
+      "SELECT country_code FROM countries WHERE country_name = $1",
+      [input]
+    );
 
-  if (result.rows.length !== 0) {
     const data = result.rows[0];
     const countryCode = data.country_code;
-
-    await db.query("INSERT INTO visited_countries (country_code) VALUES ($1)", [
-      countryCode,
-    ]);
-    res.redirect("/");
+    try {
+      await db.query(
+        "INSERT INTO visited_countries (country_code) VALUES ($1)",
+        [countryCode]
+      );
+      res.redirect("/");
+    } catch (err) {
+      console.log(err);
+      const countries = await checkVisisted();
+      res.render("index.ejs", {
+        countries: countries,
+        total: countries.length,
+        error: "This country has already been added, please a new country.",
+      });
+    }
+  } catch (err) {
+    console.log(err);
+    const countries = await checkVisisted();
+    res.render("index.ejs", {
+      countries: countries,
+      total: countries.length,
+      error: "Country name does not exist, try again.",
+    });
   }
 });
 
