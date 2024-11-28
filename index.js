@@ -18,9 +18,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
 // checking if the country has been added already to the visited country
-async function checkVisisted() {
+async function checkVisited() {
   const result = await db.query("SELECT country_code FROM visited_countries");
-
+  // assign countries as empty array
   let countries = [];
   result.rows.forEach((country) => {
     countries.push(country.country_code);
@@ -30,7 +30,7 @@ async function checkVisisted() {
 
 // GET home page
 app.get("/", async (req, res) => {
-  const countries = await checkVisisted();
+  const countries = await checkVisited();
   res.render("index.ejs", { countries: countries, total: countries.length });
 });
 
@@ -40,8 +40,8 @@ app.post("/add", async (req, res) => {
 
   try {
     const result = await db.query(
-      "SELECT country_code FROM countries WHERE country_name = $1",
-      [input]
+      "SELECT country_code FROM countries WHERE LOWER(country_name) LIKE '%'||$1||'%';",
+      [input.toLowerCase()]
     );
 
     const data = result.rows[0];
@@ -53,17 +53,19 @@ app.post("/add", async (req, res) => {
       );
       res.redirect("/");
     } catch (err) {
+      // catching error if the country already has been added
       console.log(err);
-      const countries = await checkVisisted();
+      const countries = await checkVisited();
       res.render("index.ejs", {
         countries: countries,
         total: countries.length,
-        error: "This country has already been added, please a new country.",
+        error: "This country has already been added, please add a new country.",
       });
     }
   } catch (err) {
+    // error if you time not correct country name/typos
     console.log(err);
-    const countries = await checkVisisted();
+    const countries = await checkVisited();
     res.render("index.ejs", {
       countries: countries,
       total: countries.length,
